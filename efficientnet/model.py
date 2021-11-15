@@ -12,6 +12,7 @@ from .utils import (
     load_pretrained_weights,
     Swish,
     MemoryEfficientSwish,
+    ReLU6
 )
 
 class MBConvBlock(nn.Module):
@@ -63,6 +64,7 @@ class MBConvBlock(nn.Module):
         self._project_conv = Conv2d(in_channels=oup, out_channels=final_oup, kernel_size=1, bias=False)
         self._bn2 = nn.BatchNorm2d(num_features=final_oup, momentum=self._bn_mom, eps=self._bn_eps)
         self._swish = MemoryEfficientSwish()
+        #self._swish = ReLU6()
 
     def forward(self, inputs, drop_connect_rate=None):
         """
@@ -73,6 +75,7 @@ class MBConvBlock(nn.Module):
 
         # Expansion and Depthwise Convolution
         x = inputs
+        self._swish=ReLU6()
         if self._block_args.expand_ratio != 1:
             x = self._expand_conv(inputs)
             x = self._bn0(x)
@@ -104,6 +107,7 @@ class MBConvBlock(nn.Module):
     def set_swish(self, memory_efficient=True):
         """Sets swish function as memory efficient (for training) or standard (for export)"""
         self._swish = MemoryEfficientSwish() if memory_efficient else Swish()
+        #self._swish = ReLU6()
 
 
 class EfficientNet(nn.Module):
@@ -168,10 +172,12 @@ class EfficientNet(nn.Module):
         self._dropout = nn.Dropout(self._global_params.dropout_rate)
         self._fc = nn.Linear(out_channels, self._global_params.num_classes)
         self._swish = MemoryEfficientSwish()
+        #self.swish = ReLU6()
 
     def set_swish(self, memory_efficient=True):
         """Sets swish function as memory efficient (for training) or standard (for export)"""
         self._swish = MemoryEfficientSwish() if memory_efficient else Swish()
+        #self._swish = ReLU6()
         for block in self._blocks:
             block.set_swish(memory_efficient)
 

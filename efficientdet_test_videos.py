@@ -12,15 +12,19 @@ from torch.backends import cudnn
 from backbone import EfficientDetBackbone
 from efficientdet.utils import BBoxTransform, ClipBoxes
 from utils.utils import preprocess, invert_affine, postprocess, preprocess_video
+import tvm, gc
+import vmify
 
 # Video's path
-video_src = 'videotest.mp4'  # set int to use webcam, set str to read from a video file
+video_src = 'inputs/traffic.mp4'  # set int to use webcam, set str to read from a video file
 
 compound_coef = 0
 force_input_size = None  # set None to use default size
 
 threshold = 0.2
 iou_threshold = 0.2
+frame_width=1280
+frame_height=720
 
 use_cuda = True
 use_float16 = False
@@ -44,9 +48,14 @@ input_size = input_sizes[compound_coef] if force_input_size is None else force_i
 
 # load model
 model = EfficientDetBackbone(compound_coef=compound_coef, num_classes=len(obj_list))
-model.load_state_dict(torch.load(f'weights/efficientdet-d{compound_coef}.pth'))
+model.load_state_dict(torch.load(f'models/efficientdet-d{compound_coef}.pth'))
 model.requires_grad_(False)
 model.eval()
+device = tvm.gpu(0)
+
+smart_edet = model.eval()
+smart_edetet_exe = vmify.relay_exe_from_pytorch(smart_edet, "input", torch.rand([1,3,input_size,input_size]), "cuda", "IntelligentEfficientDet/", use_scripting=True)
+smart_efficientdet_vm = tvm.runtime.vm.VirtualMachine(smart_edet_exe, device)
 
 if use_cuda:
     model = model.cuda()
@@ -76,6 +85,7 @@ clipBoxes = ClipBoxes()
 
 # Video capture
 cap = cv2.VideoCapture(video_src)
+videoWrite = cv2.VideoWriter('output_video_ReLu6.avi',cv2.VideoWriter_fourcc('M','J','P','G'), 10, (frame_width,frame_height))
 
 while True:
     ret, frame = cap.read()
@@ -94,7 +104,14 @@ while True:
 
     # model predict
     with torch.no_grad():
-        features, regression, classification, anchors = model(x)
+        #features, regression, classification, anchors = model(x)
+        gc.disable()
+        start = time.time()
+        features, regression, classification, anchors = torch.tensor(smart_edet_vm.run(tvm.nd.array(x)).asnumpy())
+        #features, regression, classification, anchors = model(x)
+        device.sync()
+        end = time.time()
+        gc.enable()
 
         out = postprocess(x,
                         anchors, regression, classification,
@@ -105,13 +122,17 @@ while True:
     out = invert_affine(framed_metas, out)
     img_show = display(out, ori_imgs)
 
-    # show frame by frame
-    cv2.imshow('frame',img_show)
-    if cv2.waitKey(1) & 0xFF == ord('q'): 
-        break
+    # Save frame by frame
+    #cv2.imshow('frame',img_show)
+       # Save output as GIF
+    videoWrite.write(img_show)
+
+    #if cv2.waitKey(1) & 0xFF == ord('q'): 
+    #    break
 
 cap.release()
-cv2.destroyAllWindows()
+videoWrite.release()
+#cv2.destroyAllWindows()
 
 
 

@@ -3,7 +3,7 @@ import torch
 from torchvision.ops.boxes import nms as nms_torch
 
 from efficientnet import EfficientNet as EffNet
-from efficientnet.utils import MemoryEfficientSwish, Swish
+from efficientnet.utils import MemoryEfficientSwish, Swish, ReLU6
 from efficientnet.utils_extra import Conv2dStaticSamePadding, MaxPool2dStaticSamePadding
 
 
@@ -38,6 +38,9 @@ class SeparableConvBlock(nn.Module):
         self.activation = activation
         if self.activation:
             self.swish = MemoryEfficientSwish() if not onnx_export else Swish()
+            #self.swish = ReLU6()
+        #self.swish = ReLU6()
+        self.swish = MemoryEfficientSwish() if not onnx_export else Swish()
 
     def forward(self, x):
         x = self.depthwise_conv(x)
@@ -101,6 +104,7 @@ class BiFPN(nn.Module):
             self.p8_downsample = MaxPool2dStaticSamePadding(3, 2)
 
         self.swish = MemoryEfficientSwish() if not onnx_export else Swish()
+        #self.swish = ReLU6()
 
         self.first_time = first_time
         if self.first_time:
@@ -357,6 +361,7 @@ class Regressor(nn.Module):
              range(pyramid_levels)])
         self.header = SeparableConvBlock(in_channels, num_anchors * 4, norm=False, activation=False)
         self.swish = MemoryEfficientSwish() if not onnx_export else Swish()
+        #self.swish = ReLU6()
 
     def forward(self, inputs):
         feats = []
@@ -394,6 +399,7 @@ class Classifier(nn.Module):
              range(pyramid_levels)])
         self.header = SeparableConvBlock(in_channels, num_anchors * num_classes, norm=False, activation=False)
         self.swish = MemoryEfficientSwish() if not onnx_export else Swish()
+        #self.swish = ReLU6()
 
     def forward(self, inputs):
         feats = []

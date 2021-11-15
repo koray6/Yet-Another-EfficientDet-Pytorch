@@ -38,7 +38,9 @@ BlockArgs.__new__.__defaults__ = (None,) * len(BlockArgs._fields)
 class SwishImplementation(torch.autograd.Function):
     @staticmethod
     def forward(ctx, i):
-        result = i * torch.sigmoid(i)
+        #result = i * torch.sigmoid(i)
+        f_relu6= nn.ReLU6()
+        result = f_relu6(i)
         ctx.save_for_backward(i)
         return result
 
@@ -57,6 +59,11 @@ class MemoryEfficientSwish(nn.Module):
 class Swish(nn.Module):
     def forward(self, x):
         return x * torch.sigmoid(x)
+
+class ReLU6(nn.Module):
+    def forward(self, x):
+        f_relu6= nn.ReLU6()
+        return f_relu6(x)
 
 
 def round_filters(filters, global_params):
@@ -109,6 +116,7 @@ class Conv2dDynamicSamePadding(nn.Conv2d):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, dilation=1, groups=1, bias=True):
         super().__init__(in_channels, out_channels, kernel_size, stride, 0, dilation, groups, bias)
         self.stride = self.stride if len(self.stride) == 2 else [self.stride[0]] * 2
+        self.swish=nn.ReLU6()
 
     def forward(self, x):
         ih, iw = x.size()[-2:]
